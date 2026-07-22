@@ -1,0 +1,25 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "sh.newsflash/newsflash",
+  "description": "5 years of corroborated news events, queryable by agents. Free tier, no key.",
+  "repository": {
+    "url": "https://github.com/zatmonkey/newsflash",
+    "source": "github"
+  },
+  "version": "1.0.1",
+  "websiteUrl": "https://newsflash.sh",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://newsflash.sh/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Bearer <API key> — optional; without it you get the keyless test tier (50 req/day, 24h lookback). Free key at https://newsflash.sh/#pricing",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

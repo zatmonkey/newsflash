@@ -1,0 +1,49 @@
+{
+  "name": "newsflash",
+  "version": "0.2.3",
+  "description": "5 years of corroborated news events, queryable from your shell — the CLI for newsflash.sh, breaking news wired for agents.",
+  "type": "module",
+  "bin": {
+    "newsflash": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "newsflash",
+    "news",
+    "mcp",
+    "agents",
+    "cli",
+    "rss",
+    "crypto",
+    "signals",
+    "alpha"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "stripe": "^22.3.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zatmonkey/newsflash.git"
+  },
+  "homepage": "https://newsflash.sh",
+  "bugs": {
+    "url": "https://github.com/zatmonkey/newsflash/issues"
+  }
+}
