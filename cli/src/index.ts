@@ -10,7 +10,7 @@ import { createInterface } from "node:readline/promises";
 // with `npm i -g newsflash` or run it with `npx newsflash`; --api /
 // NEWSFLASH_API_URL exist for tests and non-default deployments.
 
-const VERSION = "0.2.4";
+const VERSION = "0.2.5";
 const DEFAULT_API = "https://newsflash.sh";
 
 const HELP = `newsflash — query the Newsflash news & signal event graph
@@ -33,6 +33,7 @@ Options
   --api <url>       Newsflash API base URL   (env NEWSFLASH_API_URL, default ${DEFAULT_API})
   --key <key>       API key                  (env NEWSFLASH_API_KEY, or stored by 'login')
   --json            Emit raw JSON — recommended when an agent is parsing output
+  --semantic        Rank by meaning, not keywords (with -q) — adds a relevance score
   -q, --query <t>   Theme / keyword           (events, articles)
   -s, --source <s>  Source slug               (events, articles)
   -c, --category    crypto|tradfi|business|tech|politics|world|science|health|energy|sports
@@ -50,6 +51,7 @@ Tiers
 Examples
   newsflash events -q "etf" -c crypto -n 5
   newsflash events --json -q fed | jq '.[0].sources'
+  newsflash events --semantic -q "monetary easing"
   newsflash login you@example.com
 `;
 
@@ -149,6 +151,7 @@ async function main(): Promise<void> {
       key: { type: "string" },
       json: { type: "boolean", default: false },
       query: { type: "string", short: "q" },
+      semantic: { type: "boolean", default: false },
       source: { type: "string", short: "s" },
       category: { type: "string", short: "c" },
       from: { type: "string" },
@@ -174,6 +177,7 @@ async function main(): Promise<void> {
   const json = values.json;
   const listQuery = {
     q: values.query,
+    semantic: values.semantic ? "1" : undefined,
     source: values.source,
     category: values.category,
     from: values.from,
@@ -188,9 +192,10 @@ async function main(): Promise<void> {
       if (!events.length) return void console.log("No events found.");
       for (const e of events) {
         const bar = "●".repeat(Math.max(1, e.corroboration));
+        const rel = e.relevance !== undefined ? `  ·  ${Math.round(e.relevance * 100)}% match` : "";
         console.log(
           `\n[${e.id}] ${e.canonical_title}\n` +
-            `    ${e.category}  ·  ${fmtWhen(e.last_seen_at)}  ·  ${e.corroboration} src ${bar}  ·  ${e.sources.join(", ")}`,
+            `    ${e.category}  ·  ${fmtWhen(e.last_seen_at)}  ·  ${e.corroboration} src ${bar}${rel}  ·  ${e.sources.join(", ")}`,
         );
       }
       console.log(`\n${events.length} event(s).`);
