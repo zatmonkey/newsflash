@@ -10,7 +10,7 @@ import { createInterface } from "node:readline/promises";
 // with `npm i -g newsflash` or run it with `npx newsflash`; --api /
 // NEWSFLASH_API_URL exist for tests and non-default deployments.
 
-const VERSION = "0.2.5";
+const VERSION = "0.3.0";
 const DEFAULT_API = "https://newsflash.sh";
 
 const HELP = `newsflash — query the Newsflash news & signal event graph
@@ -23,6 +23,7 @@ Commands
   articles          Search raw articles
   sources           List tracked sources
   stats             Corpus size & freshness
+  stream            Live SSE stream of events as they break (Ctrl-C to stop)
   login [email]     Get a free API key (emailed one-time code)
   me                Show your tier and usage
   upgrade           Get a premium checkout link
@@ -34,9 +35,10 @@ Options
   --key <key>       API key                  (env NEWSFLASH_API_KEY, or stored by 'login')
   --json            Emit raw JSON — recommended when an agent is parsing output
   --semantic        Rank by meaning, not keywords (with -q) — adds a relevance score
-  -q, --query <t>   Theme / keyword           (events, articles)
+  -q, --query <t>   Theme / keyword           (events, articles, stream)
   -s, --source <s>  Source slug               (events, articles)
   -c, --category    crypto|tradfi|business|tech|politics|world|science|health|energy|sports
+      --min-sources <n>  (stream) only push events corroborated by ≥ n outlets
       --from <d>    ISO start date            (events)
       --to <d>      ISO end date              (events)
   -n, --limit <n>   Max results (default 20)
@@ -49,6 +51,7 @@ Tiers
   premium 50k req/day · 5y archive     ('newsflash upgrade')
 
 Examples
+  newsflash stream -c crypto --min-sources 2
   newsflash events -q "etf" -c crypto -n 5
   newsflash events --json -q fed | jq '.[0].sources'
   newsflash events --semantic -q "monetary easing"
@@ -152,6 +155,7 @@ async function main(): Promise<void> {
       json: { type: "boolean", default: false },
       query: { type: "string", short: "q" },
       semantic: { type: "boolean", default: false },
+      "min-sources": { type: "string" },
       source: { type: "string", short: "s" },
       category: { type: "string", short: "c" },
       from: { type: "string" },
@@ -199,6 +203,45 @@ async function main(): Promise<void> {
         );
       }
       console.log(`\n${events.length} event(s).`);
+      return;
+    }
+    case "stream": {
+      const url = new URL(base + "/api/stream");
+      if (values.query) url.searchParams.set("q", values.query);
+      if (values.category) url.searchParams.set("category", values.category);
+      if (values["min-sources"]) url.searchParams.set("min_corroboration", values["min-sources"]);
+      const headers: Record<string, string> = { accept: "text/event-stream" };
+      if (key) headers.authorization = `Bearer ${key}`;
+      // Long-lived by design: no timeout signal on this request.
+      const res = await fetch(url, { headers });
+      if (!res.ok || !res.body) {
+        const payload: any = await res.json().catch(() => ({}));
+        throw new Error(`Newsflash API responded ${res.status}${payload?.error ? `: ${payload.error}` : ""}`);
+      }
+      if (!json) console.log(`streaming events${values.category ? ` · ${values.category}` : ""} — Ctrl-C to stop\n`);
+      const dec = new TextDecoder();
+      let buf = "";
+      for await (const chunk of res.body) {
+        buf += dec.decode(chunk as Uint8Array, { stream: true });
+        let idx;
+        while ((idx = buf.indexOf("\n\n")) !== -1) {
+          const frame = buf.slice(0, idx);
+          buf = buf.slice(idx + 2);
+          const type = frame.match(/^event: (.+)$/m)?.[1];
+          const data = frame.match(/^data: (.+)$/m)?.[1];
+          if (!type || !data) continue; // heartbeats/comments
+          const e = JSON.parse(data);
+          if (json) {
+            console.log(JSON.stringify({ type, ...e }));
+          } else {
+            const tag = type === "event.new" ? "NEW " : `+SRC`;
+            const bar = "●".repeat(Math.max(1, Math.min(5, e.corroboration)));
+            console.log(
+              `[${tag}] ${e.canonical_title}\n       ${e.category}  ·  ${e.corroboration} src ${bar}  ·  ${e.sources.join(", ")}`,
+            );
+          }
+        }
+      }
       return;
     }
     case "articles": {
