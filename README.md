@@ -48,7 +48,7 @@ Claude Code plugin install:
 
 The endpoint is stateless (each request independent). Tools: `get_events`,
 `get_event`, `search_articles`, `list_sources`, `corpus_stats`. Setup guides for
-Claude, Cursor, ChatGPT and other hosts: [newsflash.sh/docs.html](https://newsflash.sh/docs.html).
+Claude, Cursor, ChatGPT and other hosts: [newsflash.sh/docs](https://newsflash.sh/docs).
 
 ## CLI
 
@@ -123,6 +123,6 @@ No runtime dependencies — Node ≥ 20 built-ins only.
 
 ---
 
-[docs](https://newsflash.sh/docs.html) · [sources](https://newsflash.sh/sources.html) ·
-[privacy](https://newsflash.sh/privacy.html) · [terms](https://newsflash.sh/terms.html) ·
+[docs](https://newsflash.sh/docs) · [sources](https://newsflash.sh/sources) ·
+[privacy](https://newsflash.sh/privacy) · [terms](https://newsflash.sh/terms) ·
 contact@newsflash.sh

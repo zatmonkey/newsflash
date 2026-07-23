@@ -74,7 +74,7 @@ newsflash events --json -q "fed" -c tradfi | jq '.[0] | {title: .canonical_title
 Prefer MCP? The same event graph is served over Model Context Protocol at
 `https://newsflash.sh/mcp` (Streamable HTTP — works with Claude, Cursor, and any
 MCP client; pass your key as a `Bearer` token for free/premium limits). Full
-integration guides: [newsflash.sh/docs.html](https://newsflash.sh/docs.html).
+integration guides: [newsflash.sh/docs](https://newsflash.sh/docs).
 
 ## Zero dependencies
 
@@ -83,6 +83,6 @@ argument parsing). Nothing to audit, nothing to pull in.
 
 ---
 
-[docs](https://newsflash.sh/docs.html) · [sources](https://newsflash.sh/sources.html) ·
-[privacy](https://newsflash.sh/privacy.html) · [terms](https://newsflash.sh/terms.html) ·
+[docs](https://newsflash.sh/docs) · [sources](https://newsflash.sh/sources) ·
+[privacy](https://newsflash.sh/privacy) · [terms](https://newsflash.sh/terms) ·
 contact@newsflash.sh
