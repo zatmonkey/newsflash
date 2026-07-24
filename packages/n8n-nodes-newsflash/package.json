@@ -1,0 +1,61 @@
+{
+	"name": "n8n-nodes-newsflash",
+	"version": "0.1.0",
+	"description": "n8n community node for Newsflash — real-time corroborated news events + 5-year archive, for agents. Free tier, no key.",
+	"keywords": [
+		"n8n-community-node-package",
+		"news",
+		"newsflash",
+		"events",
+		"rss",
+		"signals",
+		"agents"
+	],
+	"license": "MIT",
+	"homepage": "https://newsflash.sh",
+	"author": {
+		"name": "Alex Casassovici",
+		"email": "alex@ksso.net"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/zatmonkey/newsflash.git",
+		"directory": "packages/n8n-nodes-newsflash"
+	},
+	"engines": {
+		"node": ">=20.15"
+	},
+	"main": "index.js",
+	"scripts": {
+		"build": "tsc && node copy-icons.js",
+		"dev": "tsc --watch",
+		"format": "prettier nodes credentials --write",
+		"lint": "eslint nodes credentials package.json",
+		"lintfix": "eslint nodes credentials package.json --fix",
+		"prepublishOnly": "npm run build && npm run lint"
+	},
+	"files": [
+		"dist"
+	],
+	"n8n": {
+		"n8nNodesApiVersion": 1,
+		"credentials": [
+			"dist/credentials/NewsflashApi.credentials.js"
+		],
+		"nodes": [
+			"dist/nodes/Newsflash/Newsflash.node.js",
+			"dist/nodes/NewsflashTrigger/NewsflashTrigger.node.js"
+		]
+	},
+	"devDependencies": {
+		"@typescript-eslint/parser": "^8.32.0",
+		"eslint": "^8.57.0",
+		"eslint-plugin-n8n-nodes-base": "^1.16.3",
+		"n8n-workflow": "*",
+		"prettier": "^3.5.3",
+		"typescript": "^5.8.2"
+	},
+	"peerDependencies": {
+		"n8n-workflow": "*"
+	}
+}
