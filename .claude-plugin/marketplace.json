@@ -5,14 +5,14 @@
     "url": "https://newsflash.sh"
   },
   "metadata": {
-    "description": "Newsflash — 5 years of corroborated news events, queryable by agents",
-    "version": "1.0.1"
+    "description": "Newsflash — real-time corroborated news events + 5-year archive, for agents",
+    "version": "1.0.2"
   },
   "plugins": [
     {
       "name": "newsflash",
       "source": "./",
-      "description": "Query a deduped global news event graph (260+ sources, 10 categories, 5-year archive) over MCP. Keyless test tier works instantly; set NEWSFLASH_API_KEY for higher limits.",
+      "description": "Query a deduped global news event graph (260+ sources, 10 categories, 5-year archive) over MCP, with a real-time SSE stream and semantic search. Keyless test tier works instantly; set NEWSFLASH_API_KEY for higher limits.",
       "author": { "name": "zatmonkey" },
       "homepage": "https://newsflash.sh",
       "repository": "https://github.com/zatmonkey/newsflash",

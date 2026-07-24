@@ -1,7 +1,7 @@
 {
   "name": "newsflash",
-  "version": "1.0.1",
-  "description": "5 years of corroborated news events, queryable by agents — deduped, confidence-scored, from 260+ global sources over MCP. Keyless test tier (50 req/day); free key = 1,000 req/day · 30d; premium = full 5-year archive.",
+  "version": "1.0.2",
+  "description": "Real-time corroborated news for agents — 260+ global sources deduped into confidence-scored events, live SSE stream + semantic search + 5-year archive over MCP. Keyless test tier works instantly.",
   "author": { "name": "zatmonkey" },
   "homepage": "https://newsflash.sh",
   "repository": "https://github.com/zatmonkey/newsflash",

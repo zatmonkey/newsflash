@@ -1,12 +1,12 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "sh.newsflash/newsflash",
-  "description": "5 years of corroborated news events, queryable by agents. Free tier, no key.",
+  "description": "Real-time corroborated news events + 5-year archive, for agents. Free tier, no key.",
   "repository": {
     "url": "https://github.com/zatmonkey/newsflash",
     "source": "github"
   },
-  "version": "1.0.1",
+  "version": "1.0.2",
   "websiteUrl": "https://newsflash.sh",
   "remotes": [
     {

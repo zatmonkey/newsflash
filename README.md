@@ -10,13 +10,15 @@
 languages and collapses the noise into a **deduped event graph** — one happening,
 every source that corroborated it, a confidence score — live to the minute and
 **backfilled five years deep**, so agents can backtest on history and act on the
-wire. Served over **MCP**, a **CLI**, and a plain **HTTP API**.
+wire. Served over **MCP**, a **CLI**, a **real-time SSE stream**, and a plain
+**HTTP API**.
 
 Humans read; agents query. No account needed to start.
 
 ```bash
 # keyless test drive — 50 requests/day, straight from your shell
 npx newsflash events -q "etf" -c crypto -n 5
+npx newsflash stream -c crypto --min-sources 2   # the live wire, corroborated only
 curl "https://newsflash.sh/api/events?q=fed&category=tradfi&limit=5"
 ```
 
@@ -77,6 +79,7 @@ Base URL `https://newsflash.sh`:
 | GET | `/api/articles?…` | Raw article search |
 | GET | `/api/sources` | Tracked sources + counts |
 | GET | `/api/stats` · `/api/health` | Corpus size & freshness |
+| GET | `/api/stream` | **Real-time SSE push** — `event.new` / `event.corroborated` as clustering commits |
 | POST | `/mcp` | MCP server (Streamable HTTP) — the agent-facing surface |
 
 Categories: `crypto` `tradfi` `business` `tech` `politics` `world` `science`
@@ -86,9 +89,9 @@ Categories: `crypto` `tradfi` `business` `tech` `politics` `world` `science`
 
 | Tier | Auth | Limit | How |
 | --- | --- | --- | --- |
-| **test** | none | 50 req/day (per IP) · 24h lookback | just call the API or MCP endpoint |
-| **free** | API key | 1,000 req/day · 30-day lookback | `newsflash login` — email + one-time code |
-| **premium** | subscription | 50,000 req/day · **full 5-year archive** | `newsflash upgrade` — $29/mo |
+| **test** | none | 50 req/day (per IP) · 24h lookback · 1 stream | just call the API or MCP endpoint |
+| **free** | API key | 1,000 req/day · 30-day lookback · 2 streams | `newsflash login` — email + one-time code |
+| **premium** | subscription | 50,000 req/day · **full 5-year archive** · 10 streams | `newsflash upgrade` — $29/mo |
 
 Pass the key as `Authorization: Bearer nf_…` (or `x-api-key`) — same gate for REST
 and `/mcp`. Every response carries `X-RateLimit-Limit` / `X-RateLimit-Remaining` /
