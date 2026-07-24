@@ -1,0 +1,54 @@
+# Publishes the `newsflash` CLI to npm via OIDC Trusted Publishing — no token,
+# no OTP. One-time setup on npmjs.com: package `newsflash` → Settings →
+# Trusted Publisher → GitHub Actions → repository zatmonkey/newsflash,
+# workflow filename publish.yml.
+#
+# Release flow: bump cli/package.json + the VERSION const, commit, then
+#   git tag v<version> && git push --tags
+# The version-match guard below refuses to publish a tag that disagrees with
+# package.json.
+
+name: publish npm
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  id-token: write # OIDC token for npm trusted publishing + provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cli
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      # Trusted publishing needs npm >= 11.5.1.
+      - run: npm install -g npm@latest && npm --version
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - name: Guard — tag must match package.json and the VERSION const
+        run: |
+          PKG=$(node -p "require('./package.json').version")
+          TAG="${GITHUB_REF_NAME#v}"
+          BIN=$(node dist/index.js -V)
+          echo "tag=$TAG pkg=$PKG bin=$BIN"
+          test "$PKG" = "$TAG" || { echo "::error::tag $TAG != package.json $PKG"; exit 1; }
+          test "$BIN" = "$TAG" || { echo "::error::tag $TAG != VERSION const $BIN"; exit 1; }
+
+      - name: Smoke test against production
+        run: node dist/index.js stats
+
+      - run: npm publish
