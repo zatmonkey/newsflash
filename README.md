@@ -98,6 +98,14 @@ Base URL `https://newsflash.sh`:
 Categories: `crypto` `tradfi` `business` `tech` `politics` `world` `science`
 `health` `energy` `sports`.
 
+## OpenAPI
+
+The full REST surface is described in [`openapi.yaml`](openapi.yaml) — an
+OpenAPI 3.1 spec with exact request/response schemas for every endpoint above
+(including the SSE stream and the auth flow), derived from the live API. Import
+it into Pipedream, RapidAPI, Postman, or a custom GPT Action to drive Newsflash
+from your own tooling, or generate a typed client with any OpenAPI generator.
+
 ## Tiers
 
 | Tier | Auth | Limit | How |

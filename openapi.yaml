@@ -1,0 +1,866 @@
+openapi: 3.1.0
+
+info:
+  title: Newsflash API
+  version: 1.5.0
+  summary: Corroborated news events for autonomous agents
+  description: >-
+    Real-time corroborated news events + 5-year archive, for agents.
+    Free tier, no key.
+
+
+    Newsflash crawls hundreds of news sources and dedups articles into an
+    **event graph**: one happening, its corroborating sources, and a
+    confidence score (`min(1, source_count / 3)`). Query events over REST,
+    subscribe to the live SSE stream, or use the MCP endpoint / `newsflash`
+    CLI built on the same contract.
+
+
+    **Tiers.** Every data route works without a key on the keyless `test`
+    tier (per-IP daily budget, 24-hour history window). A free API key —
+    email + one-time code, `POST /api/auth/request-code` then
+    `POST /api/auth/verify` — raises the daily budget and extends history to
+    30 days. Premium unlocks the full archive. The active tier and history
+    window are echoed on every data response in the `X-Newsflash-Tier` and
+    `X-Newsflash-Lookback-Days` headers.
+  termsOfService: https://newsflash.sh/terms
+  contact:
+    name: Newsflash
+    email: contact@newsflash.sh
+    url: https://newsflash.sh
+
+servers:
+  - url: https://newsflash.sh
+    description: Hosted service
+
+security:
+  - {}
+  - bearerAuth: []
+  - apiKeyHeader: []
+
+tags:
+  - name: Events
+    description: Deduplicated, corroborated news events — the primary surface.
+  - name: Articles
+    description: Raw crawled articles behind the events.
+  - name: Sources
+    description: The crawled source catalog.
+  - name: Stream
+    description: Real-time Server-Sent Events feed.
+  - name: Auth
+    description: Free API key issuance via email one-time code.
+  - name: Meta
+    description: Service health and corpus statistics.
+
+paths:
+  /api/events:
+    get:
+      operationId: listEvents
+      tags: [Events]
+      summary: List news events
+      description: >-
+        Returns deduplicated news events, newest first. With `q` alone,
+        performs keyword matching; add `semantic=1` to rank by semantic
+        similarity instead (each event then carries a `relevance` score and
+        the response is flagged `semantic: true`). Results are clamped to
+        your tier's history window; when clamping applies, the response
+        includes a `window` object describing the effective start date.
+        Unknown `category` values and unparsable dates are ignored rather
+        than rejected; `limit` is clamped to 1–100.
+      parameters:
+        - name: q
+          in: query
+          description: >-
+            Search query. Keyword match by default; semantic ranking when
+            combined with `semantic=1`.
+          schema:
+            type: string
+        - name: semantic
+          in: query
+          description: >-
+            Set to `1` to rank `q` by semantic (embedding cosine) similarity
+            instead of keyword matching. Requires `q`.
+          schema:
+            type: string
+            enum: ["1"]
+        - name: source
+          in: query
+          description: Filter to a single source by slug (see `/api/sources`).
+          schema:
+            type: string
+        - $ref: "#/components/parameters/category"
+        - $ref: "#/components/parameters/from"
+        - $ref: "#/components/parameters/to"
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Matching events.
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/X-RateLimit-Limit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/X-RateLimit-Remaining"
+            X-Newsflash-Tier:
+              $ref: "#/components/headers/X-Newsflash-Tier"
+            X-Newsflash-Lookback-Days:
+              $ref: "#/components/headers/X-Newsflash-Lookback-Days"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventList"
+              example:
+                count: 1
+                events:
+                  - id: 497660
+                    canonical_title: FG sets up committee to review VAT framework
+                    summary: The Federal Government has inaugurated a committee to develop a new VAT framework.
+                    category: world
+                    first_seen_at: "2026-07-24T21:23:40.597Z"
+                    last_seen_at: "2026-07-24T21:23:40.597Z"
+                    article_count: 1
+                    source_count: 1
+                    sources: [punchng]
+                    corroboration: 1
+                    confidence: 0.3333333333333333
+                window:
+                  from: "2026-07-23T21:30:13.756Z"
+                  note: the test tier can query the last 24 hours — premium unlocks the full archive (https://newsflash.sh/#pricing)
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/events/{id}:
+    get:
+      operationId: getEvent
+      tags: [Events]
+      summary: Get one event with its articles
+      description: >-
+        Returns a single event by numeric id, including the corroborating
+        `articles` array. Events older than your tier's history window
+        answer `403`.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Numeric event id.
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: The event with its articles.
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/X-RateLimit-Limit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/X-RateLimit-Remaining"
+            X-Newsflash-Tier:
+              $ref: "#/components/headers/X-Newsflash-Tier"
+            X-Newsflash-Lookback-Days:
+              $ref: "#/components/headers/X-Newsflash-Lookback-Days"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventDetail"
+        "400":
+          description: The id is not an integer.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "invalid event id: expected an integer"
+        "403":
+          description: The event exists but is outside your tier's history window.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: event is outside your tier's history window
+                hint: the test tier can query the last 24 hours — premium unlocks the full archive (https://newsflash.sh/#pricing)
+        "404":
+          description: No event with this id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: event not found
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/articles:
+    get:
+      operationId: listArticles
+      tags: [Articles]
+      summary: List raw articles
+      description: >-
+        Returns raw crawled articles, newest first, with the same filters
+        and tier history window as `/api/events`.
+      parameters:
+        - name: q
+          in: query
+          description: Keyword search over article titles.
+          schema:
+            type: string
+        - name: source
+          in: query
+          description: Filter to a single source by slug (see `/api/sources`).
+          schema:
+            type: string
+        - $ref: "#/components/parameters/category"
+        - $ref: "#/components/parameters/from"
+        - $ref: "#/components/parameters/to"
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Matching articles.
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/X-RateLimit-Limit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/X-RateLimit-Remaining"
+            X-Newsflash-Tier:
+              $ref: "#/components/headers/X-Newsflash-Tier"
+            X-Newsflash-Lookback-Days:
+              $ref: "#/components/headers/X-Newsflash-Lookback-Days"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArticleList"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/sources:
+    get:
+      operationId: listSources
+      tags: [Sources]
+      summary: List crawled sources
+      description: The full source catalog with per-source article counts.
+      responses:
+        "200":
+          description: All sources.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Source"
+
+  /api/stats:
+    get:
+      operationId: getStats
+      tags: [Meta]
+      summary: Corpus statistics
+      responses:
+        "200":
+          description: Current corpus counts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Stats"
+              example:
+                sources: 265
+                articles: 503838
+                events: 465827
+                latest: "2026-07-24T21:23:40.597Z"
+
+  /api/health:
+    get:
+      operationId: getHealth
+      tags: [Meta]
+      summary: Service health
+      responses:
+        "200":
+          description: Service is up.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+              example:
+                ok: true
+                sources: 265
+                articles: 503838
+                events: 465827
+                latest: "2026-07-24T21:23:40.597Z"
+
+  /api/stream:
+    get:
+      operationId: streamEvents
+      tags: [Stream]
+      summary: Real-time event stream (SSE)
+      description: >-
+        Server-Sent Events stream (`Content-Type: text/event-stream`) that
+        pushes events as clustering commits them. Works with `EventSource`
+        and `curl -N`. Two named SSE event types are emitted:
+
+
+        - `event.new` — a brand-new event was created; `data` is the event
+        JSON (same shape as an item of `/api/events`).
+
+        - `event.corroborated` — an existing event gained corroboration
+        (`corroboration >= 2`); `data` is the updated event JSON.
+
+
+        Each SSE message's `id` field is `<eventId>:<corroboration>`.
+        Comment heartbeats (`:hb <timestamp>`) are sent every ~25 s to keep
+        intermediaries from idling out the connection, and the stream opens
+        with `retry: 5000` plus a `:connected tier=<tier>` comment.
+        Connecting costs one request from your daily budget; concurrent
+        connections are capped per tier.
+      parameters:
+        - name: category
+          in: query
+          description: Only push events in this category.
+          schema:
+            $ref: "#/components/schemas/Category"
+        - name: q
+          in: query
+          description: Only push events whose title contains this string (case-insensitive).
+          schema:
+            type: string
+        - name: min_corroboration
+          in: query
+          description: Only push events with at least this many corroborating sources.
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+      responses:
+        "200":
+          description: >-
+            An open SSE stream. Stays open until the client disconnects.
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/X-RateLimit-Limit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/X-RateLimit-Remaining"
+            X-Newsflash-Tier:
+              $ref: "#/components/headers/X-Newsflash-Tier"
+            X-Newsflash-Lookback-Days:
+              $ref: "#/components/headers/X-Newsflash-Lookback-Days"
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: >-
+                  Stream of SSE messages. Named events `event.new` and
+                  `event.corroborated` carry an Event JSON object in `data`.
+              example: |
+                retry: 5000
+                :connected tier=test
+
+                event: event.new
+                id: 497660:1
+                data: {"id":497660,"canonical_title":"FG sets up committee to review VAT framework","summary":"…","category":"world","first_seen_at":"2026-07-24T21:23:40.597Z","last_seen_at":"2026-07-24T21:23:40.597Z","article_count":1,"source_count":1,"sources":["punchng"],"corroboration":1,"confidence":0.3333333333333333}
+
+                :hb 1784928659823
+        "429":
+          description: >-
+            Daily request budget exhausted, or too many concurrent stream
+            connections for your tier.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/RateLimitError"
+                  - $ref: "#/components/schemas/Error"
+
+  /api/auth/request-code:
+    post:
+      operationId: requestCode
+      tags: [Auth]
+      summary: Request a one-time login code
+      description: >-
+        Emails a 6-digit one-time code to the given address. Follow with
+        `POST /api/auth/verify` to obtain a free API key. Code requests are
+        rate-limited per IP.
+      security:
+        - {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        "200":
+          description: Code sent.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sent]
+                properties:
+                  sent:
+                    type: boolean
+                    const: true
+        "400":
+          description: Missing or invalid email.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: a valid email is required
+        "429":
+          description: Too many code requests from this IP today.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: too many code requests from this address today
+
+  /api/auth/verify:
+    post:
+      operationId: verifyCode
+      tags: [Auth]
+      summary: Exchange a one-time code for an API key
+      description: >-
+        Verifies the emailed 6-digit code and returns the API key
+        (`nf_…`). **The key is returned exactly once and is never
+        retrievable again** — store it immediately. Use it as
+        `Authorization: Bearer nf_…` or in the `x-api-key` header.
+      security:
+        - {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, code]
+              properties:
+                email:
+                  type: string
+                  format: email
+                code:
+                  type: string
+                  pattern: "^\\d{6}$"
+                  description: The 6-digit code from the email.
+      responses:
+        "200":
+          description: Key issued.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [apiKey, tier, note]
+                properties:
+                  apiKey:
+                    type: string
+                    description: The API key, prefixed `nf_`. Shown only once.
+                  tier:
+                    type: string
+                    description: The tier this key grants.
+                    examples: [free]
+                  note:
+                    type: string
+                    examples:
+                      - store this key now — it is shown only once
+        "400":
+          description: >-
+            Missing/invalid email or code, no code requested for this email,
+            or the code is wrong or expired.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: no code requested for this email
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: >-
+        API key (`nf_…`) as a bearer token. Optional — every data route also
+        works keyless on the test tier.
+    apiKeyHeader:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: The same `nf_…` API key, as a header instead of a bearer token.
+
+  parameters:
+    category:
+      name: category
+      in: query
+      description: Filter by category.
+      schema:
+        $ref: "#/components/schemas/Category"
+    from:
+      name: from
+      in: query
+      description: >-
+        Only items first seen at/after this time (ISO 8601 date or
+        date-time). Clamped to your tier's history window.
+      schema:
+        type: string
+        examples: ["2026-07-24", "2026-07-24T12:00:00Z"]
+    to:
+      name: to
+      in: query
+      description: Only items first seen at/before this time (ISO 8601 date or date-time).
+      schema:
+        type: string
+        examples: ["2026-07-24T21:00:00Z"]
+    limit:
+      name: limit
+      in: query
+      description: Maximum items to return (clamped to 1–100).
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 25
+
+  headers:
+    X-RateLimit-Limit:
+      description: Your tier's daily request budget.
+      schema:
+        type: integer
+    X-RateLimit-Remaining:
+      description: Requests remaining today (resets at midnight UTC).
+      schema:
+        type: integer
+    X-Newsflash-Tier:
+      description: The tier this request was served under.
+      schema:
+        type: string
+        enum: [test, free, premium]
+    X-Newsflash-Lookback-Days:
+      description: History window in days, or `unlimited`.
+      schema:
+        type: string
+        examples: ["1", "30", "unlimited"]
+
+  responses:
+    RateLimited:
+      description: >-
+        Daily request budget exhausted for your tier. The body names the
+        concrete next action (get a free key, or upgrade). Resets at
+        midnight UTC.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/RateLimitError"
+          example:
+            error: daily limit reached (50 requests/day on the keyless test tier)
+            hint: "a free API key raises this to 1000/day + 30-day history. Human: run 'npx newsflash login' (email + one-time code, ~30s). Agent: ask your human to do that, or drive POST https://newsflash.sh/api/auth/request-code {email} then POST /api/auth/verify {email, code}."
+            next:
+              action: create_free_key
+              cli: npx newsflash login
+              api:
+                - POST https://newsflash.sh/api/auth/request-code {"email"}
+                - POST https://newsflash.sh/api/auth/verify {"email","code"} -> {"apiKey"}
+              docs: https://newsflash.sh/docs#auth
+            resets: midnight UTC
+
+  schemas:
+    Category:
+      type: string
+      description: Event/article/source category.
+      enum:
+        - crypto
+        - tradfi
+        - business
+        - tech
+        - politics
+        - world
+        - science
+        - health
+        - energy
+        - sports
+
+    Event:
+      type: object
+      description: >-
+        One deduplicated happening with its corroborating sources.
+        `confidence` is derived as `min(1, source_count / 3)`.
+      required:
+        - id
+        - canonical_title
+        - summary
+        - category
+        - first_seen_at
+        - last_seen_at
+        - article_count
+        - source_count
+        - sources
+        - corroboration
+        - confidence
+      properties:
+        id:
+          type: integer
+          description: Stable numeric event id.
+        canonical_title:
+          type: string
+          description: Title of the first article that created the event.
+        summary:
+          type: [string, "null"]
+          description: Short summary, when the source feed provided one.
+        category:
+          $ref: "#/components/schemas/Category"
+        first_seen_at:
+          type: string
+          format: date-time
+          description: When the first article of this event was seen.
+        last_seen_at:
+          type: string
+          format: date-time
+          description: When the most recent corroborating article was seen.
+        article_count:
+          type: integer
+          description: Number of articles clustered into this event.
+        source_count:
+          type: integer
+          description: Number of distinct sources reporting this event.
+        sources:
+          type: array
+          description: Slugs of the distinct sources reporting this event.
+          items:
+            type: string
+        corroboration:
+          type: integer
+          minimum: 1
+          description: Distinct corroborating sources (same value as `source_count`).
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: "`min(1, source_count / 3)` — 1.0 at three or more sources."
+        relevance:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: >-
+            Cosine similarity to the query. Present only on semantic
+            searches (`q` + `semantic=1`).
+
+    EventList:
+      type: object
+      required: [count, events]
+      properties:
+        count:
+          type: integer
+          description: Number of events returned.
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/Event"
+        semantic:
+          type: boolean
+          description: Present and `true` when the query was ranked semantically.
+        window:
+          $ref: "#/components/schemas/Window"
+
+    EventDetail:
+      allOf:
+        - $ref: "#/components/schemas/Event"
+        - type: object
+          required: [articles]
+          properties:
+            articles:
+              type: array
+              description: The corroborating articles, newest first.
+              items:
+                $ref: "#/components/schemas/EventArticle"
+
+    EventArticle:
+      type: object
+      description: An article as embedded in an event detail response.
+      required: [source, title, url, summary, published_at]
+      properties:
+        source:
+          type: string
+          description: Source slug.
+        title:
+          type: string
+        url:
+          type: string
+          format: uri
+        summary:
+          type: [string, "null"]
+        published_at:
+          type: string
+          format: date-time
+
+    Article:
+      type: object
+      description: A raw crawled article.
+      required:
+        - id
+        - source
+        - category
+        - title
+        - url
+        - summary
+        - author
+        - published_at
+        - event_id
+      properties:
+        id:
+          type: integer
+        source:
+          type: string
+          description: Source slug.
+        category:
+          $ref: "#/components/schemas/Category"
+        title:
+          type: string
+        url:
+          type: string
+          format: uri
+        summary:
+          type: [string, "null"]
+        author:
+          type: [string, "null"]
+        published_at:
+          type: string
+          format: date-time
+          description: >-
+            Sanitized publication time (invalid feed dates fall back to
+            fetch time; future dates are clamped).
+        event_id:
+          type: [integer, "null"]
+          description: The event this article was clustered into, if any.
+
+    ArticleList:
+      type: object
+      required: [count, articles]
+      properties:
+        count:
+          type: integer
+        articles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Article"
+        window:
+          $ref: "#/components/schemas/Window"
+
+    Source:
+      type: object
+      description: One crawled source.
+      required:
+        - slug
+        - name
+        - category
+        - homepage
+        - lang
+        - country
+        - article_count
+        - latest
+      properties:
+        slug:
+          type: string
+          description: Stable identifier, used in `source` filters.
+        name:
+          type: string
+        category:
+          $ref: "#/components/schemas/Category"
+        homepage:
+          type: string
+          format: uri
+        lang:
+          type: string
+          description: ISO 639-1 language code.
+        country:
+          type: string
+          description: ISO 3166-1 alpha-2 country code.
+        article_count:
+          type: integer
+        latest:
+          type: [string, "null"]
+          format: date-time
+          description: Publication time of the newest article from this source.
+
+    Window:
+      type: object
+      description: >-
+        Present when the query was clamped to the tier's history window.
+      required: [from, note]
+      properties:
+        from:
+          type: string
+          format: date-time
+          description: Effective start of the queried window.
+        note:
+          type: string
+          description: Human/agent-readable explanation of the clamp.
+
+    Stats:
+      type: object
+      required: [sources, articles, events, latest]
+      properties:
+        sources:
+          type: integer
+        articles:
+          type: integer
+        events:
+          type: integer
+        latest:
+          type: [string, "null"]
+          format: date-time
+          description: Timestamp of the newest article in the corpus.
+
+    Health:
+      allOf:
+        - type: object
+          required: [ok]
+          properties:
+            ok:
+              type: boolean
+        - $ref: "#/components/schemas/Stats"
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        hint:
+          type: string
+          description: Suggested next step, when applicable.
+
+    RateLimitError:
+      type: object
+      description: Returned with HTTP 429 when the daily request budget is exhausted.
+      required: [error, hint, resets]
+      properties:
+        error:
+          type: string
+        hint:
+          type: string
+          description: Concrete next action for both humans and agents.
+        next:
+          type: object
+          description: Machine-readable next action (absent on the premium tier).
+          required: [action, cli, api, docs]
+          properties:
+            action:
+              type: string
+              description: Next-step identifier.
+              enum: [create_free_key, upgrade_premium]
+            cli:
+              type: string
+              description: CLI command that performs the action.
+            api:
+              type: array
+              description: HTTP calls that perform the action.
+              items:
+                type: string
+            docs:
+              type: string
+              format: uri
+        resets:
+          type: string
+          description: When the budget resets.
+          examples: [midnight UTC]
