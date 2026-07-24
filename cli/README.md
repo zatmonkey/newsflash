@@ -42,6 +42,7 @@ newsflash me                      # shows your tier and today's usage
 | `newsflash articles` | Search raw articles |
 | `newsflash sources` | List tracked sources |
 | `newsflash stats` | Corpus size & freshness |
+| `newsflash stream` | Live SSE feed of events as they break & corroborate |
 | `newsflash login [email]` | Get a free API key (emailed one-time code) |
 | `newsflash me` | Show your tier and usage |
 | `newsflash upgrade` | Print a premium checkout link |

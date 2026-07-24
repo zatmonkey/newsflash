@@ -10,7 +10,7 @@ import { createInterface } from "node:readline/promises";
 // with `npm i -g newsflash` or run it with `npx newsflash`; --api /
 // NEWSFLASH_API_URL exist for tests and non-default deployments.
 
-const VERSION = "0.3.0";
+const VERSION = "0.3.1";
 const DEFAULT_API = "https://newsflash.sh";
 
 const HELP = `newsflash — query the Newsflash news & signal event graph

@@ -1,6 +1,6 @@
 {
   "name": "newsflash",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "5 years of corroborated news events, queryable from your shell — the CLI for newsflash.sh, breaking news wired for agents.",
   "type": "module",
   "bin": {
