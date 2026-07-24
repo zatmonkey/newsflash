@@ -58,7 +58,7 @@ A ready-made skill ships in this repo ([`skills/newsflash/`](skills/newsflash/))
 personalized daily briefings + real-time breaking-news alerts:
 
 ```
-openclaw skills install git:zatmonkey/newsflash --as newsflash
+clawhub install newsflash        # or: openclaw skills install git:zatmonkey/newsflash
 ```
 
 Then tell your agent "set up my news briefing". It interviews you for interests,
