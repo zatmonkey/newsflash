@@ -52,6 +52,19 @@ The endpoint is stateless (each request independent). Tools: `get_events`,
 `get_event`, `search_articles`, `list_sources`, `corpus_stats`. Setup guides for
 Claude, Cursor, ChatGPT and other hosts: [newsflash.sh/docs](https://newsflash.sh/docs).
 
+## OpenClaw
+
+A ready-made skill ships in this repo ([`skills/newsflash/`](skills/newsflash/)) —
+personalized daily briefings + real-time breaking-news alerts:
+
+```
+openclaw skills install git:zatmonkey/newsflash --as newsflash
+```
+
+Then tell your agent "set up my news briefing". It interviews you for interests,
+schedules a daily brief, and (if you enable alerts) watches the live stream and
+pings you when a story crosses your corroboration threshold.
+
 ## CLI
 
 A standalone, **zero-dependency** npm package ([`./cli`](cli/), published as
