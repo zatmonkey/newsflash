@@ -9,86 +9,112 @@ metadata: {"openclaw": {"emoji": "⚡", "requires": {"anyBins": ["npx", "curl"]}
 
 Newsflash collapses 260+ global outlets into deduplicated **events**. Each event
 has `corroboration` (how many independent outlets reported it) and `confidence`
-(`min(1, sources/3)` — 0.33 = single-outlet rumor, 1.0 = wire-wide). Treat
-confidence as your trust gate: **never present a 0.33 event as fact — call it
-"one outlet reports…"**. Prefer events, not raw articles.
+(`min(1, sources/3)` — 0.33 = single-outlet rumor, 1.0 = wire-wide). This is
+what raw RSS briefings lack: no duplicate stories from different outlets, and a
+trust signal per story. **Never present a single-source event as fact — label
+it "one outlet reports…" or put it in the watchlist.**
 
-Works keyless immediately (50 req/day, 24h history, 1 live stream). If
-`NEWSFLASH_API_KEY` is set you get more (free key: 1,000/day, 30-day history,
-2 streams; premium: 50,000/day, full 5-year archive, 10 streams).
+Works keyless immediately (50 req/day, 24h history, 1 live stream). With
+`NEWSFLASH_API_KEY`: free key = 1,000/day, 30-day history, 2 streams; premium =
+50,000/day, full 5-year archive, 10 streams.
 
 ## Interests file
 
-Keep the user's preferences in `newsflash.json` in the workspace:
+Keep preferences in `newsflash.json` in the workspace:
 
 ```json
 {
   "interests": ["AI chips and semiconductor supply", "bitcoin ETFs", "EU energy policy"],
-  "categories": ["tech", "crypto"],
-  "briefing_time": "07:30",
+  "categories": ["tech", "crypto", "business", "world"],
+  "briefing_time": "06:00",
   "alerts": { "enabled": true, "min_sources": 3, "quiet_hours": "23:00-07:00" },
   "alerted_event_ids": []
 }
 ```
 
-If it doesn't exist, interview the user first: 3–5 interests in their own words
-(free text is good — search is semantic), preferred briefing time, and whether
-they want breaking-news alerts. Then create the file.
+If missing, interview the user first: 3–5 interests in their own words (free
+text — search is semantic), which categories they follow
+(crypto tradfi business tech politics world science health energy sports),
+briefing time, and whether they want breaking alerts. Then create the file.
 
 ## Daily briefing
 
 When asked for a briefing (or the scheduled job fires):
 
-1. For each interest:
-   `npx newsflash events --semantic -q "<interest>" --json -n 6`
-2. For each configured category, the biggest confirmed stories:
-   `npx newsflash events --json -c <category> -n 10` — keep `corroboration >= 2`.
-3. Compose ONE compact briefing, most corroborated first. Per item: headline ·
-   sources count (`3 src`) · outlet names · why it matters (one clause). Mark
-   single-source items explicitly as unconfirmed, or drop them. Dedupe across
-   sections (same event id = one mention). End with a one-line "watchlist" of
-   rumors worth watching (0.33 items that match interests).
-4. Deliver via the user's channel. Keep it under ~20 lines unless asked.
+1. **Gather.** Per configured category:
+   `npx newsflash events --json -c <category> -n 60`
+   — keep the events with `corroboration >= 2`, sorted by corroboration, top
+   4–5 per category. Per interest additionally:
+   `npx newsflash events --semantic -q "<interest>" --json -n 6`.
+2. **Dedupe across sections** by event `id` — one mention, in the most
+   relevant section. If the same story surfaced via an interest AND a
+   category, prefer the interest section.
+3. **Links.** For each item you include, get a clickable source link:
+   `curl -s https://newsflash.sh/api/events/<id>` → use the first article's
+   `url`. Budget note: only fetch details for items that made the cut.
+4. **Compose** in this shape (match the user's channel formatting):
 
-To make it recurring, use the cron tool to schedule this skill daily at
-`briefing_time` with the message "newsflash daily briefing".
+```
+🌅 Morning News Briefing
+<Weekday, Month D, YYYY> • <time> <tz>
+━━━━━━━━━━━━━━━━━━━━━━
+
+💻 Technology
+1. <Headline> — <one clause on why it matters>. ✔ 5 outlets (engadget, techcrunch, theverge, …) <link>
+2. …
+
+🪙 Crypto
+…
+
+👀 Watchlist (single-source, unconfirmed)
+• <headline> — only <outlet> so far. <link>
+
+━━━━━━━━━━━━━━━━━━━━━━
+Deduped & corroboration-ranked by newsflash.sh — ✔ N outlets = independently confirmed
+```
+
+Rules: most-corroborated first inside each section; show the outlet count and
+2–4 outlet names per item; the watchlist holds interest-matching 1-source
+items (max 3) — everything else uncorroborated gets dropped, not laundered
+into the main sections. Keep the whole briefing under ~30 lines.
+
+5. To make it recurring, use the cron tool: schedule daily at `briefing_time`
+   with the message "newsflash daily briefing".
 
 ## Real-time alerts (the live wire)
 
-If `alerts.enabled`, run the stream as a background process and watch it:
+If `alerts.enabled`, keep a background process running:
 
 ```
 npx newsflash stream --json --min-sources <min_sources>
 ```
 
-Each line is one JSON event (`type` = `event.new` or `event.corroborated`).
-Alert the user ONLY when all of these hold:
+Each line is one JSON event (`type` = `event.new` | `event.corroborated`).
+Alert ONLY when ALL hold:
 
-- the event matches one of their interests (title vs interests — you judge), or
-  its category is in their configured categories AND `corroboration >= min_sources`
-- its `id` is not in `alerted_event_ids` (append after alerting — no repeats;
-  keep only the last 200 ids)
-- current time is outside `quiet_hours` (else queue it for the morning briefing)
+- matches an interest (judge the title against interests yourself) OR its
+  `category` is configured AND `corroboration >= min_sources`
+- `id` not in `alerted_event_ids` (append after alerting; keep last 200)
+- outside `quiet_hours` — else save it for the morning briefing
 
-Alert format: one message — `⚡ <headline> — <N> outlets (<names>), confidence
-<score>`. No commentary unless the user asked for analysis.
+Alert format, one message, no filler:
+`⚡ <headline> — ✔ <N> outlets (<top 3 names>) <link>`
 
-The stream drops on restarts; if the background process dies, restart it. On
-the keyless tier you have exactly 1 concurrent stream — don't start a second.
+If the stream process dies, restart it. Keyless tier = exactly 1 concurrent
+stream; don't start a second.
 
-## Answering ad-hoc news questions
+## Ad-hoc questions
 
 - "what's happening with X" → `npx newsflash events --semantic -q "X" --json -n 8`
-- historical/backtest questions ("what did coverage look like in 2023") →
-  add `--from 2023-01-01 --to 2023-12-31` (needs premium for >30 days back;
-  if the response carries a `window` note, tell the user their tier's history
-  limit was applied rather than pretending there was no news)
-- detail/underlying articles for one event: `curl -s https://newsflash.sh/api/events/<id>`
+- history/backtests → add `--from`/`--to` (>30 days back needs premium; if the
+  response has a `window` note, SAY the tier clamped the window — don't report
+  "no news")
+- one event's full articles → `curl -s https://newsflash.sh/api/events/<id>`
 
 ## Limits & upgrades
 
-On a 429, the response's `next` field says exactly what to do — relay it: a
-free key is `npx newsflash login` (email + one-time code, ~30 seconds), premium
-(`npx newsflash upgrade`, $29/mo) unlocks the full 5-year archive, 50k req/day,
-and 10 concurrent streams. Suggest premium only when the user actually hits a
-wall (history clamps, stream caps, daily 429s) — not preemptively.
+On 429 the response's `next` field says exactly what to do — relay it. Free
+key: `npx newsflash login` (email + one-time code, ~30s). Premium
+(`npx newsflash upgrade`, $29/mo): full 5-year archive, 50k req/day, 10
+streams. Suggest upgrades only when the user hits a wall (window clamps,
+stream caps, daily 429s) — never preemptively.
